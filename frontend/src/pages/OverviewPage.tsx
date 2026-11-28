@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { getComparison, type Comparison, type Totals } from "../api/comparison";
 import ImportDialog from "../components/ImportDialog/ImportDialog";
 import MonthNav from "../components/MonthNav/MonthNav";
+import PageHeader from "../components/PageHeader/PageHeader";
 import RatesNotice from "../components/RatesNotice/RatesNotice";
 import StatCard, { type Tone } from "../components/StatCard/StatCard";
 import TransactionList from "../components/TransactionList/TransactionList";
@@ -130,31 +131,25 @@ export default function OverviewPage() {
 
   return (
     <section>
-      <header className={styles.heading}>
-        <div>
-          <h1 className={styles.title}>Overview</h1>
-          <p className={styles.subtitle}>A clear picture of your money</p>
-        </div>
-        <div className={styles.actions}>
-          {shown && (
-            <MonthNav
-              month={shown.month}
-              latestMonth={latestMonth}
-              busy={busy}
-              onSelect={load}
-              suffix={`· ${shown.currency}`}
-            />
-          )}
-          <button
-            ref={importButton}
-            type="button"
-            className={styles.import}
-            onClick={() => setImportOpen(true)}
-          >
-            Import transactions
-          </button>
-        </div>
-      </header>
+      <PageHeader title="Overview" subtitle="A clear picture of your money">
+        {shown && (
+          <MonthNav
+            month={shown.month}
+            latestMonth={latestMonth}
+            busy={busy}
+            onSelect={load}
+            suffix={`· ${shown.currency}`}
+          />
+        )}
+        <button
+          ref={importButton}
+          type="button"
+          className={styles.import}
+          onClick={() => setImportOpen(true)}
+        >
+          Import transactions
+        </button>
+      </PageHeader>
 
       {noTransactions && (
         <p className={styles.message}>
