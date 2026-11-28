@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { getTransactions, type Transaction } from "../api/transactions";
 import CategoryFilter from "../components/CategoryFilter/CategoryFilter";
 import MonthNav from "../components/MonthNav/MonthNav";
+import PageHeader from "../components/PageHeader/PageHeader";
 import SearchBox from "../components/SearchBox/SearchBox";
 import TransactionList from "../components/TransactionList/TransactionList";
 import TransactionTabs, {
@@ -141,11 +142,7 @@ export default function TransactionsPage() {
 
   return (
     <div>
-      <header className={styles.heading}>
-        <div>
-          <h1 className={styles.title}>Transactions</h1>
-          <p className={styles.subtitle}>Manage and track your money</p>
-        </div>
+      <PageHeader title="Transactions" subtitle="Manage and track your money">
         {shown && (
           <MonthNav
             month={shown.month}
@@ -154,7 +151,7 @@ export default function TransactionsPage() {
             onSelect={load}
           />
         )}
-      </header>
+      </PageHeader>
 
       {noTransactions && (
         <p className={styles.message}>
