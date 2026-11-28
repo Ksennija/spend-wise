@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId } from 'react';
+import { useDropdown } from '../../hooks/useDropdown';
 import { CATEGORIES } from '../../lib/categories';
 import styles from './CategoryFilter.module.scss';
 
@@ -17,19 +18,8 @@ function buttonText(selected: string[]): string {
 }
 
 export default function CategoryFilter({ selected, onChange }: Props) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const { open, toggle, close, rootProps, buttonRef } = useDropdown();
   const panelId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-  }, [open]);
 
   function toggleCategory(id: string, checked: boolean) {
     // Reported in the order of the list, not in the order of the clicks.
@@ -39,27 +29,15 @@ export default function CategoryFilter({ selected, onChange }: Props) {
     onChange(CATEGORIES.filter((c) => next.has(c.id)).map((c) => c.id));
   }
 
-  // Escape and the Close button both close the panel and give the focus back to the button.
-  function closePanel() {
-    setOpen(false);
-    buttonRef.current?.focus();
-  }
-
   return (
-    <div
-      ref={rootRef}
-      className={styles.root}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && open) closePanel();
-      }}
-    >
+    <div {...rootProps} className={styles.root}>
       <button
         ref={buttonRef}
         type="button"
         className={styles.button}
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
       >
         {buttonText(selected)}
       </button>
@@ -90,7 +68,7 @@ export default function CategoryFilter({ selected, onChange }: Props) {
             >
               Clear
             </button>
-            <button type="button" className={styles.action} onClick={closePanel}>
+            <button type="button" className={styles.action} onClick={close}>
               Close
             </button>
           </div>
