@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getComparison, type Comparison, type Totals } from "../api/comparison";
 import ImportDialog from "../components/ImportDialog/ImportDialog";
@@ -11,6 +11,7 @@ import {
   useMonthNavigation,
   type MonthResult,
 } from "../hooks/useMonthNavigation";
+import { useCurrency } from "../hooks/useCurrency";
 import { useRecentTransactions } from "../hooks/useRecentTransactions";
 import { formatMonthName } from "../lib/months";
 import styles from "./OverviewPage.module.scss";
@@ -80,15 +81,19 @@ function changeTone(
 }
 
 async function fetchComparison(
-  month: string | undefined
+  month: string | undefined,
+  currency: string | undefined
 ): Promise<MonthResult<Comparison>> {
-  const result = await getComparison(month);
+  const result = await getComparison(month, currency);
   return result.ok ? { ok: true, data: result.comparison } : result;
 }
 
 export default function OverviewPage() {
-  const { view, requested, latestMonth, load } =
-    useMonthNavigation(fetchComparison);
+  const { selected, report, forget } = useCurrency();
+  // Only the user's own choice goes to the server. Without one the server picks the currency.
+  const { view, requested, latestMonth, load } = useMonthNavigation((month) =>
+    fetchComparison(month, selected)
+  );
   const [importOpen, setImportOpen] = useState(false);
   const [importCount, setImportCount] = useState(0);
   const importButton = useRef<HTMLButtonElement>(null);
@@ -105,10 +110,32 @@ export default function OverviewPage() {
       ? view.data
       : null;
   const busy = view.status === "loading";
-  const recent = useRecentTransactions(
-    view.status === "ready" && !noTransactions ? view.data.month : null,
-    importCount
-  );
+  // The recent transactions follow the month on screen. While that month loads again (a new
+  // currency) it is the same month, so they are not asked for again.
+  const recent = useRecentTransactions(shown?.month ?? null, importCount);
+  // The currency the server used is what the dropdown shows until the user chooses one.
+  useEffect(() => {
+    if (view.status === "ready") report(view.data.currency);
+  }, [view, report]);
+
+  // A saved currency the server does not know is forgotten, and the month loads again without it.
+  // Until then the page waits instead of showing an error.
+  const rejectedCurrency =
+    view.status === "error" &&
+    view.code === "invalid-currency" &&
+    selected !== undefined;
+  useEffect(() => {
+    if (rejectedCurrency) forget();
+  }, [rejectedCurrency, forget]);
+
+  // Choosing another currency loads the month on screen again.
+  const loadedWith = useRef(selected);
+  useEffect(() => {
+    if (loadedWith.current === selected) return;
+    loadedWith.current = selected;
+    load(requested);
+  }, [selected, requested, load]);
+
   // After an import both the totals and the recent transactions may have changed.
   function handleImported() {
     load(requested);
@@ -138,7 +165,6 @@ export default function OverviewPage() {
             latestMonth={latestMonth}
             busy={busy}
             onSelect={load}
-            suffix={`· ${shown.currency}`}
           />
         )}
         <button
@@ -158,7 +184,7 @@ export default function OverviewPage() {
         </p>
       )}
 
-      {view.status === "error" && (
+      {view.status === "error" && !rejectedCurrency && (
         <>
           <p role="alert" className={cx(styles.message, styles.error)}>
             {view.code === "rates-unavailable"
@@ -177,7 +203,7 @@ export default function OverviewPage() {
 
       {shown?.ratesApproximate && <RatesNotice />}
 
-      {view.status === "loading" && (
+      {(view.status === "loading" || rejectedCurrency) && (
         <p role="status" className={styles.message}>
           Loading…
         </p>

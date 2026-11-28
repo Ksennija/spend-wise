@@ -160,7 +160,7 @@ describe("App", () => {
     expect(await screen.findByText(/user@example\.com/)).not.toBeNull();
     expect(screen.getByRole("button", { name: /sign out/i })).not.toBeNull();
     expect(
-      await screen.findByRole("heading", { name: "September 2026 · EUR" })
+      await screen.findByRole("heading", { name: "September 2026" })
     ).not.toBeNull();
     expect(
       screen.getByRole("button", { name: "Import transactions" })
@@ -273,7 +273,7 @@ describe("App", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole("heading", { name: "September 2026 · EUR" })).not.toBeNull();
+    expect(await screen.findByRole("heading", { name: "September 2026" })).not.toBeNull();
     expect(screen.queryByRole("heading", { name: /sign in|sign up/i })).toBeNull();
   });
 

@@ -19,7 +19,7 @@ After importing bank transactions (`csvImportSpec.md`), the user needs the whole
 - **Income**: sum of positive transactions in the month
 - **Spent**: sum of negative transactions in the month, shown as a positive number
 - **Saved**: Income - Spent. Negative when more was spent than came in
-- Amounts of other currencies are converted to one currency by the comparison endpoint and shown in that currency
+- Amounts of other currencies are converted to one currency by the comparison endpoint and shown in that currency. The user chooses the currency in the dropdown on the right of the bar (see below); without a choice the server picks the most common currency of the user's transactions
 - Transfers to savings accounts are not recognised (see Out of scope). They count as Spent
 
 ## Behaviour
@@ -32,7 +32,7 @@ Example for September (previous month August):
 | Spent  | €2,960.00 | ↑ €370.00 |
 | Saved  | €240.00   | ↓ €270.00 |
 
-- The table heading names the month and currency, e.g. "September 2026 · EUR"
+- The heading names the month, e.g. "September 2026". The currency is shown in the dropdown in the bar, not in the heading
 - **Amounts** are shown with cents so that Income - Spent = Saved adds up exactly as displayed
 - **Change**: an arrow, the absolute difference, and "vs <previous month name>". ↑ when the value rose, ↓ when it fell. A difference of zero reads "no change vs August"
 - The meaning is carried by arrow and text, not by colour alone. Colour may support it (a rise in Spent and a fall in Income or Saved are unfavourable)
@@ -41,6 +41,14 @@ Example for September (previous month August):
 - Month navigation: "Previous month" and "Next month" buttons. "Next month" is disabled on the latest month with transactions (the month the page opened on). "Previous month" is not limited, so the user can reach months without transactions, which show zeros
 - Amounts and changes come from `GET /api/comparison?month=YYYY-MM` (`current`, `change` fields). Money is formatted for display only. No money arithmetic in the browser except what the API already provides
 - The page is part of the authenticated area. A logged-out user sees the login page, not the overview
+
+## Currency choice
+
+- A dropdown with a search sits on the right of the bar above the heading ("Currency"). It lists the currencies the rate service supports, and filters as the user types, by code or name
+- The dropdown shows the currency the server used until the user chooses another. Choosing one loads the month on screen again with `GET /api/comparison?currency=XXX` (and the month, when one was asked for)
+- The choice stays when the user changes page and after a reload (it is kept in the browser). If the browser blocks storage, it lasts for the visit
+- A saved currency the server rejects (`invalid-currency`) is forgotten, and the page loads again with the server's own choice, without showing an error
+- The recent transactions are not converted, so they do not reload
 
 ## States
 
@@ -73,7 +81,7 @@ Example for September (previous month August):
 - Transfers to savings accounts (recognising them, or counting them as saved). They are treated as spent
 - Detailed spending report and per-category breakdown (the next step after this overview)
 - Charts and comparisons other than the previous calendar month
-- Choosing the currency or a stored home currency setting
+- A home currency saved on the user's account (the choice is only kept in the browser)
 - Percentage changes in the UI (the API already returns them)
 - Editing, filtering or listing individual transactions
 

@@ -1,7 +1,9 @@
 import { jest } from "@jest/globals";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { CurrencyProvider } from "../context/CurrencyProvider";
+import { useCurrency } from "../hooks/useCurrency";
 import OverviewPage from "./OverviewPage";
 
 type Totals = { spendingCents: number; incomeCents: number; netCents: number };
@@ -98,7 +100,7 @@ describe("OverviewPage", () => {
     renderPage();
 
     expect(screen.getByRole("status").textContent).toMatch(/loading/i);
-    expect(await screen.findByRole("heading", { name: "September 2026 · EUR" })).not.toBeNull();
+    expect(await screen.findByRole("heading", { name: "September 2026" })).not.toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     expect(card(INCOME).textContent).toContain("€3,200.00");
     expect(card(SPENT).textContent).toContain("€2,960.00");
@@ -157,7 +159,7 @@ describe("OverviewPage", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "September 2026 · USD" })).not.toBeNull();
+    expect(await screen.findByRole("heading", { name: "September 2026" })).not.toBeNull();
     expect(card(INCOME).textContent).toContain("$10.00");
   });
 
@@ -321,7 +323,7 @@ describe("OverviewPage", () => {
       expect(fetchMock).toHaveBeenCalledWith("/api/transactions?month=2026-09");
 
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
-      await screen.findByRole("heading", { name: "August 2026 · EUR" });
+      await screen.findByRole("heading", { name: "August 2026" });
 
       expect(fetchMock).toHaveBeenCalledWith("/api/transactions?month=2026-08");
     });
@@ -439,6 +441,164 @@ describe("OverviewPage", () => {
     });
   });
 
+  describe("currency", () => {
+    // Shows what the provider holds and lets a test choose a currency, as the dropdown does.
+    function CurrencyProbe() {
+      const { current, selected, choose } = useCurrency();
+      return (
+        <div>
+          <p data-testid="current">{current ?? "none"}</p>
+          <p data-testid="selected">{selected ?? "none"}</p>
+          <button type="button" onClick={() => choose("GBP")}>
+            Pick GBP
+          </button>
+        </div>
+      );
+    }
+
+    function renderWithCurrency() {
+      render(
+        <MemoryRouter>
+          <CurrencyProvider>
+            <CurrencyProbe />
+            <OverviewPage />
+          </CurrencyProvider>
+        </MemoryRouter>
+      );
+    }
+
+    const urls = (fetchMock: { mock: { calls: unknown[][] } }, start: string) =>
+      fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith(start));
+    const USD_SEPTEMBER = comparison("2026-09", "2026-08", totals(320000, 296000), totals(310000, 259000), "USD");
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it("asks for no currency when none is chosen, and reports the one the server used", async () => {
+      const fetchMock = mockApi({ "/api/comparison": [SEPTEMBER] });
+
+      renderWithCurrency();
+      await screen.findByRole("article", { name: INCOME });
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/comparison");
+      await waitFor(() => expect(screen.getByTestId("current").textContent).toBe("EUR"));
+      expect(screen.getByTestId("selected").textContent).toBe("none");
+    });
+
+    it("asks for the saved currency from the start, and shows the amounts in it", async () => {
+      localStorage.setItem("spendwise.currency", "USD");
+      const fetchMock = mockApi({ "/api/comparison?currency=USD": [USD_SEPTEMBER] });
+
+      renderWithCurrency();
+      await screen.findByRole("article", { name: INCOME });
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/comparison?currency=USD");
+      expect(card(INCOME).textContent).toContain("$3,200.00");
+      await waitFor(() => expect(screen.getByTestId("current").textContent).toBe("USD"));
+    });
+
+    it("loads the month on screen again, in the new currency, when the user chooses one", async () => {
+      const GBP_SEPTEMBER = comparison("2026-09", "2026-08", totals(320000, 296000), totals(310000, 259000), "GBP");
+      const fetchMock = mockApi({
+        "/api/comparison": [SEPTEMBER],
+        "/api/comparison?currency=GBP": [GBP_SEPTEMBER],
+      });
+      renderWithCurrency();
+      await screen.findByRole("article", { name: INCOME });
+
+      await userEvent.click(screen.getByRole("button", { name: "Pick GBP" }));
+
+      expect(await screen.findByText("£3,200.00")).not.toBeNull();
+      expect(urls(fetchMock, "/api/comparison")).toEqual(["/api/comparison", "/api/comparison?currency=GBP"]);
+      expect(screen.getByTestId("selected").textContent).toBe("GBP");
+    });
+
+    it("keeps the month the user is looking at when the currency changes", async () => {
+      const GBP_AUGUST = comparison("2026-08", "2026-07", totals(310000, 259000), totals(300000, 250000), "GBP");
+      const fetchMock = mockApi({
+        "/api/comparison": [SEPTEMBER],
+        "/api/comparison?month=2026-08": [AUGUST],
+        "/api/comparison?month=2026-08&currency=GBP": [GBP_AUGUST],
+      });
+      renderWithCurrency();
+      await screen.findByRole("article", { name: INCOME });
+      await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
+      await screen.findByRole("heading", { name: "August 2026" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Pick GBP" }));
+
+      expect(await screen.findByText("£3,100.00")).not.toBeNull();
+      expect(screen.getByRole("heading", { name: "August 2026" })).not.toBeNull();
+      expect(urls(fetchMock, "/api/comparison").at(-1)).toBe("/api/comparison?month=2026-08&currency=GBP");
+    });
+
+    it("does not load the recent transactions again when the currency changes, they are not converted", async () => {
+      const GBP_SEPTEMBER = comparison("2026-09", "2026-08", totals(320000, 296000), totals(310000, 259000), "GBP");
+      const fetchMock = mockApi({
+        "/api/comparison": [SEPTEMBER],
+        "/api/comparison?currency=GBP": [GBP_SEPTEMBER],
+      });
+      renderWithCurrency();
+      await screen.findByRole("article", { name: INCOME });
+
+      await userEvent.click(screen.getByRole("button", { name: "Pick GBP" }));
+      await screen.findByText("£3,200.00");
+
+      expect(urls(fetchMock, "/api/transactions")).toEqual(["/api/transactions?month=2026-09"]);
+    });
+
+    it("forgets a saved currency the server rejects, asks again without it and shows no error", async () => {
+      localStorage.setItem("spendwise.currency", "XYZ");
+      const fetchMock = mockApi({
+        "/api/comparison?currency=XYZ": [
+          { status: 400, body: { code: "invalid-currency", message: "Unsupported currency: EUR/XYZ" } },
+        ],
+        "/api/comparison": [SEPTEMBER],
+      });
+
+      renderWithCurrency();
+
+      expect(await screen.findByRole("article", { name: INCOME })).not.toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(urls(fetchMock, "/api/comparison")).toEqual(["/api/comparison?currency=XYZ", "/api/comparison"]);
+      expect(localStorage.getItem("spendwise.currency")).toBeNull();
+      expect(screen.getByTestId("selected").textContent).toBe("none");
+      await waitFor(() => expect(screen.getByTestId("current").textContent).toBe("EUR"));
+    });
+
+    it("still shows an invalid-currency error when no currency was chosen, instead of asking again", async () => {
+      const fetchMock = mockApi({
+        "/api/comparison": [{ status: 400, body: { code: "invalid-currency", message: "Unsupported currency" } }],
+      });
+
+      renderWithCurrency();
+
+      expect((await screen.findByRole("alert")).textContent).toBe("Unsupported currency");
+      expect(urls(fetchMock, "/api/comparison")).toHaveLength(1);
+    });
+
+    it("keeps the chosen currency when the user retries after a rates error", async () => {
+      localStorage.setItem("spendwise.currency", "USD");
+      const fetchMock = mockApi({ "/api/comparison?currency=USD": [RATES_UNAVAILABLE, USD_SEPTEMBER] });
+      renderWithCurrency();
+      await screen.findByRole("alert");
+
+      await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+      expect(await screen.findByRole("article", { name: INCOME })).not.toBeNull();
+      expect(urls(fetchMock, "/api/comparison")).toEqual(["/api/comparison?currency=USD", "/api/comparison?currency=USD"]);
+    });
+
+    it("shows only the month in the month name, because the currency is in the dropdown", async () => {
+      mockApi({ "/api/comparison": [SEPTEMBER] });
+
+      renderWithCurrency();
+
+      expect(await screen.findByRole("heading", { level: 2, name: "September 2026" })).not.toBeNull();
+    });
+  });
+
   describe("month navigation", () => {
     it("goes to the previous month and shows its cards", async () => {
       const fetchMock = mockApi({ "/api/comparison": [SEPTEMBER], "/api/comparison?month=2026-08": [AUGUST] });
@@ -447,7 +607,7 @@ describe("OverviewPage", () => {
       await screen.findByRole("article", { name: INCOME });
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
 
-      expect(await screen.findByRole("heading", { name: "August 2026 · EUR" })).not.toBeNull();
+      expect(await screen.findByRole("heading", { name: "August 2026" })).not.toBeNull();
       expect(card(SAVED).textContent).toContain("€510.00");
       expect(card(SAVED).textContent).toContain("vs July");
       expect(comparisonCalls(fetchMock).at(-1)).toBe("/api/comparison?month=2026-08");
@@ -462,7 +622,7 @@ describe("OverviewPage", () => {
       expect(next.disabled).toBe(true);
 
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
-      await screen.findByRole("heading", { name: "August 2026 · EUR" });
+      await screen.findByRole("heading", { name: "August 2026" });
 
       expect(next.disabled).toBe(false);
     });
@@ -477,10 +637,10 @@ describe("OverviewPage", () => {
       renderPage();
       await screen.findByRole("article", { name: INCOME });
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
-      await screen.findByRole("heading", { name: "August 2026 · EUR" });
+      await screen.findByRole("heading", { name: "August 2026" });
       await userEvent.click(screen.getByRole("button", { name: /next month/i }));
 
-      expect(await screen.findByRole("heading", { name: "September 2026 · EUR" })).not.toBeNull();
+      expect(await screen.findByRole("heading", { name: "September 2026" })).not.toBeNull();
       expect(comparisonCalls(fetchMock).at(-1)).toBe("/api/comparison?month=2026-09");
       expect((screen.getByRole("button", { name: /next month/i }) as HTMLButtonElement).disabled).toBe(true);
     });
@@ -494,7 +654,7 @@ describe("OverviewPage", () => {
       await screen.findByRole("article", { name: INCOME });
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
 
-      expect(await screen.findByRole("heading", { name: "December 2026 · EUR" })).not.toBeNull();
+      expect(await screen.findByRole("heading", { name: "December 2026" })).not.toBeNull();
     });
 
     it("shows zeros for an earlier month without transactions, not the empty state", async () => {
@@ -505,7 +665,7 @@ describe("OverviewPage", () => {
       await screen.findByRole("article", { name: INCOME });
       await userEvent.click(screen.getByRole("button", { name: /previous month/i }));
 
-      expect(await screen.findByRole("heading", { name: "July 2026 · EUR" })).not.toBeNull();
+      expect(await screen.findByRole("heading", { name: "July 2026" })).not.toBeNull();
       expect(card(INCOME).textContent).toContain("€0.00");
       expect(screen.queryByText(/no transactions yet/i)).toBeNull();
     });

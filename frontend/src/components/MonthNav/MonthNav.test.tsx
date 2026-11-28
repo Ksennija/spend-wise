@@ -22,12 +22,6 @@ describe("MonthNav", () => {
     expect(screen.getByRole("heading", { level: 2, name: "September 2026" })).not.toBeNull();
   });
 
-  it("adds the suffix to the name of the month", () => {
-    renderNav({ suffix: "· EUR" });
-
-    expect(screen.getByRole("heading", { name: "September 2026 · EUR" })).not.toBeNull();
-  });
-
   it("asks for the month before when Previous month is pressed", async () => {
     const onSelect = renderNav();
 
