@@ -17,6 +17,7 @@
 // The user on the left. Anything else in the bar, such as a dropdown, goes on the right.
 .bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);

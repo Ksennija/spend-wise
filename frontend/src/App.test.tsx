@@ -438,4 +438,70 @@ describe("App", () => {
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     }
   );
+
+  describe("currency dropdown", () => {
+    const NO_CATEGORY_CHANGES = {
+      status: 200,
+      body: { code: "category-changes", month: "2026-09", currency: "EUR", hasTransactions: false, changes: [] },
+    };
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it.each([
+      [
+        "/overview",
+        true,
+        {
+          "GET /api/comparison": [COMPARISON],
+          "GET /api/transactions?month=2026-09": [NO_RECENT_TRANSACTIONS],
+        },
+      ],
+      ["/insights", true, { "GET /api/category-changes": [NO_CATEGORY_CHANGES] }],
+      [
+        "/transactions",
+        false,
+        {
+          "GET /api/transactions": [
+            { status: 200, body: { code: "transactions", month: "2026-09", transactions: [] } },
+          ],
+        },
+      ],
+    ])("%s shows the currency dropdown: %s", async (path, shown, routes) => {
+      mockApi({ "GET /api/me": [LOGGED_IN_ME], ...routes });
+
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      );
+
+      await screen.findByRole("heading", { level: 1 });
+      expect(screen.queryByText("Currency") !== null).toBe(shown);
+    });
+
+    it("keeps the chosen currency when the user moves to another page", async () => {
+      localStorage.setItem("spendwise.currency", "USD");
+      mockApi({
+        "GET /api/me": [LOGGED_IN_ME],
+        "GET /api/comparison": [COMPARISON],
+        "GET /api/transactions?month=2026-09": [NO_RECENT_TRANSACTIONS],
+        "GET /api/category-changes": [NO_CATEGORY_CHANGES],
+      });
+      render(
+        <MemoryRouter initialEntries={["/overview"]}>
+          <App />
+        </MemoryRouter>
+      );
+      await screen.findByRole("heading", { level: 1, name: "Overview" });
+      expect(screen.getByRole("button", { name: "Currency USD · US Dollar" })).not.toBeNull();
+
+      const nav = screen.getByRole("navigation", { name: "Main" });
+      await userEvent.click(within(nav).getByRole("link", { name: "Insights" }));
+
+      await screen.findByRole("heading", { level: 1, name: "Insights" });
+      expect(screen.getByRole("button", { name: "Currency USD · US Dollar" })).not.toBeNull();
+    });
+  });
 });

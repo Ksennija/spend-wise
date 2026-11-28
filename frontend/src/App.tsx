@@ -14,6 +14,7 @@ import PlaceholderPage from "./pages/PlaceholderPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import { getCurrentUser, type CurrentUser } from "./api/session";
 import AuthenticatedLayout from "./components/AuthenticatedLayout/AuthenticatedLayout";
+import { CurrencyProvider } from "./context/CurrencyProvider";
 import LoginPage from "./pages/LoginPage";
 import RegistrationPage from "./pages/RegistrationPage";
 
@@ -51,12 +52,16 @@ function App() {
 
   if (session.status === "logged-in") {
     const user = session.user;
-    // Every signed-in page shares one layout: the main landmark and "Logged in as …".
-    const signedIn = (page: ReactNode) => (
-      <AuthenticatedLayout user={user}>{page}</AuthenticatedLayout>
+    // Every signed-in page shares one layout: the main landmark and "Logged in as …". The pages
+    // whose amounts are converted into a currency also get the currency dropdown.
+    const signedIn = (page: ReactNode, showCurrency = false) => (
+      <AuthenticatedLayout user={user} showCurrency={showCurrency}>
+        {page}
+      </AuthenticatedLayout>
     );
+    // The chosen currency lives above the routes, so it stays when the user changes page.
     return (
-      <>
+      <CurrencyProvider>
         <NavBar
           user={session.user}
           onLoggedOut={() => setSession({ status: "logged-out" })}
@@ -67,13 +72,13 @@ function App() {
           <Route path="/signup" element={<Navigate to="/overview" replace />} />
           <Route
             path="/overview"
-            element={signedIn(<OverviewPage />)}
+            element={signedIn(<OverviewPage />, true)}
           />
           <Route path="/transactions" element={signedIn(<TransactionsPage />)} />
-          <Route path="/insights" element={signedIn(<InsightsPage />)} />
+          <Route path="/insights" element={signedIn(<InsightsPage />, true)} />
           <Route path="*" element={<PlaceholderPage title="Error page" />} />
         </Routes>
-      </>
+      </CurrencyProvider>
     );
   }
 
