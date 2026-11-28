@@ -54,10 +54,15 @@ function toChange(value: unknown): Change | null {
   };
 }
 
-// Without a month the server reports the month of the user's most recent transaction.
-export async function getComparison(month?: string): Promise<ComparisonResult> {
+// Without a month the server reports the month of the user's most recent transaction. Without a
+// currency it converts into the most common currency of the user's transactions.
+export async function getComparison(month?: string, currency?: string): Promise<ComparisonResult> {
   try {
-    const res = await fetch(month ? `/api/comparison?month=${month}` : '/api/comparison');
+    const params = new URLSearchParams();
+    if (month) params.set('month', month);
+    if (currency) params.set('currency', currency);
+    const query = params.toString();
+    const res = await fetch(query ? `/api/comparison?${query}` : '/api/comparison');
     const body = await res.json();
 
     if (res.ok) {

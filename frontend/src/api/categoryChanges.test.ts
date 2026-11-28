@@ -35,6 +35,32 @@ describe("getCategoryChanges", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/category-changes");
   });
 
+  it("requests the given currency", async () => {
+    const fetchMock = mockFetchResponse(200, BODY);
+
+    await getCategoryChanges("USD");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/category-changes?currency=USD");
+  });
+
+  it("sends no currency when none is given", async () => {
+    const fetchMock = mockFetchResponse(200, BODY);
+
+    await getCategoryChanges();
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/category-changes");
+  });
+
+  it("returns the code and message of an invalid-currency error", async () => {
+    mockFetchResponse(400, { code: "invalid-currency", message: "Currency must be a three-letter code" });
+
+    expect(await getCategoryChanges("XYZ")).toEqual({
+      ok: false,
+      code: "invalid-currency",
+      message: "Currency must be a three-letter code",
+    });
+  });
+
   it("returns the month, currency and the changes in cents", async () => {
     mockFetchResponse(200, BODY);
 

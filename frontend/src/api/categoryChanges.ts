@@ -34,9 +34,10 @@ function toChange(value: unknown): CategoryChange | null {
   return { category: change.category, direction: change.direction, amountCents: change.amountCents };
 }
 
-export async function getCategoryChanges(): Promise<CategoryChangesResult> {
+// Without a currency the server converts into the most common currency of the user's transactions.
+export async function getCategoryChanges(currency?: string): Promise<CategoryChangesResult> {
   try {
-    const res = await fetch('/api/category-changes');
+    const res = await fetch(currency ? `/api/category-changes?currency=${encodeURIComponent(currency)}` : '/api/category-changes');
     const body = await res.json();
 
     if (res.ok) {

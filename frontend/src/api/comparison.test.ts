@@ -48,6 +48,40 @@ describe("getComparison", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/comparison?month=2026-08");
   });
 
+  it("requests the given currency", async () => {
+    const fetchMock = mockFetchResponse(200, BODY);
+
+    await getComparison(undefined, "USD");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/comparison?currency=USD");
+  });
+
+  it("requests the given month and currency together", async () => {
+    const fetchMock = mockFetchResponse(200, BODY);
+
+    await getComparison("2026-08", "USD");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/comparison?month=2026-08&currency=USD");
+  });
+
+  it("sends no currency when none is given", async () => {
+    const fetchMock = mockFetchResponse(200, BODY);
+
+    await getComparison("2026-08");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/comparison?month=2026-08");
+  });
+
+  it("returns the code and message of an invalid-currency error", async () => {
+    mockFetchResponse(400, { code: "invalid-currency", message: "Unsupported currency: EUR/XYZ" });
+
+    expect(await getComparison(undefined, "XYZ")).toEqual({
+      ok: false,
+      code: "invalid-currency",
+      message: "Unsupported currency: EUR/XYZ",
+    });
+  });
+
   it("returns the months, currency, totals and change in cents", async () => {
     mockFetchResponse(200, BODY);
 
