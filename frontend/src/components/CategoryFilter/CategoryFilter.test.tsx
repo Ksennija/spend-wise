@@ -131,4 +131,36 @@ describe("CategoryFilter", () => {
     await userEvent.click(screen.getByRole("heading", { name: "Outside" }));
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
   });
+
+  it("has a Close button next to Clear while the panel is open, and none while it is closed", async () => {
+    renderFilter();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+
+    await openPanel();
+
+    expect(screen.getByRole("button", { name: "Clear" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Close" })).not.toBeNull();
+  });
+
+  it("closes the panel with Close, keeps the checked categories and puts the focus back on the button", async () => {
+    const onChange = renderFilter(["groceries"]);
+    await openPanel("Groceries");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(toggle("Groceries").getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle("Groceries"));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("can be opened again after Close", async () => {
+    renderFilter();
+    await openPanel();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await openPanel();
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(12);
+  });
 });
