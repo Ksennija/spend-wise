@@ -654,3 +654,82 @@
 
 **Priority:** Medium
 **Type:** Negative / Regression
+
+---
+
+# Test Case 27: The amounts follow the chosen currency
+
+**Preconditions:**
+
+- Same as Test Case 1
+- The user's transactions are mostly in EUR, so the server's own choice is EUR
+
+**Test Data:**
+
+- Currency chosen in the dropdown of the bar: USD
+
+**Steps:**
+
+1. Click "Insights" in the nav bar. The amounts are in EUR and the dropdown shows "EUR · Euro"
+2. Open the "Currency" dropdown, type "dollar" and choose "USD · US Dollar"
+
+**Expected Result:**
+
+- "Loading…" is shown, not the old euro amounts, while the page loads again
+- The page asks for `GET /api/category-changes?currency=USD`, and every amount is shown in dollars
+- The choice stays when the user goes to the Overview and back, and after a reload of the browser
+
+**Priority:** High
+**Type:** Functional
+
+---
+
+# Test Case 28: The first request asks for no currency
+
+**Preconditions:**
+
+- Same as Test Case 1
+- The user has not chosen a currency in this browser
+
+**Test Data:**
+
+- None
+
+**Steps:**
+
+1. Click "Insights" in the nav bar
+
+**Expected Result:**
+
+- The page asks for `GET /api/category-changes` without a currency, so the server decides
+- The dropdown shows the currency the server used
+
+**Priority:** Medium
+**Type:** Functional
+
+---
+
+# Test Case 29: A saved currency the server rejects is forgotten
+
+**Preconditions:**
+
+- Same as Test Case 1
+- The browser has a saved currency the server rejects with `invalid-currency`
+
+**Test Data:**
+
+- Saved currency: XYZ
+
+**Steps:**
+
+1. Click "Insights" in the nav bar
+
+**Expected Result:**
+
+- The page asks for the saved currency, gets `invalid-currency`, and asks again without a currency
+- No error is shown, and the changes are shown in the server's own currency
+- The saved currency is removed from the browser, and the dropdown shows the server's currency
+
+**Priority:** Medium
+**Type:** Negative / Error handling
+

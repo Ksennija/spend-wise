@@ -1,6 +1,8 @@
 import { jest } from "@jest/globals";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { CurrencyProvider } from "../context/CurrencyProvider";
+import { useCurrency } from "../hooks/useCurrency";
 import InsightsPage from "./InsightsPage";
 
 // Routes fetch calls by URL; each route returns the next queued response.
@@ -123,4 +125,146 @@ describe("InsightsPage", () => {
       "Exchange rates are currently unavailable. Try again in a moment."
     );
   });
+
+  describe("currency", () => {
+    // Shows what the provider holds and lets a test choose a currency, as the dropdown does.
+    function CurrencyProbe() {
+      const { current, selected, choose } = useCurrency();
+      return (
+        <div>
+          <p data-testid="current">{current ?? "none"}</p>
+          <p data-testid="selected">{selected ?? "none"}</p>
+          <button type="button" onClick={() => choose("GBP")}>
+            Pick GBP
+          </button>
+        </div>
+      );
+    }
+
+    function renderWithCurrency() {
+      render(
+        <CurrencyProvider>
+          <CurrencyProbe />
+          <InsightsPage />
+        </CurrencyProvider>
+      );
+    }
+
+    const inCurrency = (currency: string) => ({
+      status: 200,
+      body: { ...WITH_CHANGES.body, currency },
+    });
+    const urls = (fetchMock: { mock: { calls: unknown[][] } }) => fetchMock.mock.calls.map(([url]) => String(url));
+
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it("asks for no currency when none is chosen, and reports the one the server used", async () => {
+      const fetchMock = mockApi({ "/api/category-changes": [WITH_CHANGES] });
+
+      renderWithCurrency();
+      await screen.findByRole("cell", { name: "Increase €60" });
+
+      expect(urls(fetchMock)).toEqual(["/api/category-changes"]);
+      await waitFor(() => expect(screen.getByTestId("current").textContent).toBe("EUR"));
+      expect(screen.getByTestId("selected").textContent).toBe("none");
+    });
+
+    it("asks for the saved currency from the start, and shows the amounts in it", async () => {
+      localStorage.setItem("spendwise.currency", "USD");
+      const fetchMock = mockApi({ "/api/category-changes?currency=USD": [inCurrency("USD")] });
+
+      renderWithCurrency();
+
+      expect(await screen.findByRole("cell", { name: "Increase $60" })).not.toBeNull();
+      expect(urls(fetchMock)).toEqual(["/api/category-changes?currency=USD"]);
+      await waitFor(() => expect(screen.getByTestId("current").textContent).toBe("USD"));
+    });
+
+    it("loads again, in the new currency, when the user chooses one", async () => {
+      const fetchMock = mockApi({
+        "/api/category-changes": [WITH_CHANGES],
+        "/api/category-changes?currency=GBP": [inCurrency("GBP")],
+      });
+      renderWithCurrency();
+      await screen.findByRole("cell", { name: "Increase €60" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Pick GBP" }));
+
+      expect(await screen.findByRole("cell", { name: "Increase £60" })).not.toBeNull();
+      expect(urls(fetchMock)).toEqual(["/api/category-changes", "/api/category-changes?currency=GBP"]);
+      expect(screen.getByTestId("selected").textContent).toBe("GBP");
+    });
+
+    it("shows Loading…, not the old amounts, while it loads again in the new currency", async () => {
+      let release: (value: unknown) => void = () => {};
+      const pending = new Promise((resolve) => {
+        release = resolve;
+      });
+      globalThis.fetch = jest.fn(async (url: string) => {
+        if (url === "/api/category-changes") {
+          return { ok: true, status: 200, json: async () => WITH_CHANGES.body };
+        }
+        await pending;
+        return { ok: true, status: 200, json: async () => inCurrency("GBP").body };
+      }) as unknown as typeof fetch;
+      renderWithCurrency();
+      await screen.findByRole("cell", { name: "Increase €60" });
+
+      await userEvent.click(screen.getByRole("button", { name: "Pick GBP" }));
+
+      expect(screen.getByRole("status").textContent).toMatch(/loading/i);
+      expect(screen.queryByRole("cell", { name: "Increase €60" })).toBeNull();
+      release(undefined);
+      expect(await screen.findByRole("cell", { name: "Increase £60" })).not.toBeNull();
+    });
+
+    it("forgets a saved currency the server rejects, asks again without it and shows no error", async () => {
+      localStorage.setItem("spendwise.currency", "XYZ");
+      const fetchMock = mockApi({
+        "/api/category-changes?currency=XYZ": [
+          { status: 400, body: { code: "invalid-currency", message: "Unsupported currency: EUR/XYZ" } },
+        ],
+        "/api/category-changes": [WITH_CHANGES],
+      });
+
+      renderWithCurrency();
+
+      expect(await screen.findByRole("cell", { name: "Increase €60" })).not.toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(urls(fetchMock)).toEqual(["/api/category-changes?currency=XYZ", "/api/category-changes"]);
+      expect(localStorage.getItem("spendwise.currency")).toBeNull();
+      expect(screen.getByTestId("selected").textContent).toBe("none");
+    });
+
+    it("still shows an invalid-currency error when no currency was chosen, instead of asking again", async () => {
+      const fetchMock = mockApi({
+        "/api/category-changes": [{ status: 400, body: { code: "invalid-currency", message: "Unsupported currency" } }],
+      });
+
+      renderWithCurrency();
+
+      expect((await screen.findByRole("alert")).textContent).toBe("Unsupported currency");
+      expect(urls(fetchMock)).toHaveLength(1);
+    });
+
+    it("keeps the chosen currency when the user retries after an error", async () => {
+      localStorage.setItem("spendwise.currency", "USD");
+      const fetchMock = mockApi({
+        "/api/category-changes?currency=USD": [
+          { status: 500, body: { code: "server-error", message: "Something went wrong" } },
+          inCurrency("USD"),
+        ],
+      });
+      renderWithCurrency();
+      await screen.findByRole("alert");
+
+      await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+      expect(await screen.findByRole("cell", { name: "Increase $60" })).not.toBeNull();
+      expect(urls(fetchMock)).toEqual(["/api/category-changes?currency=USD", "/api/category-changes?currency=USD"]);
+    });
+  });
 });
+

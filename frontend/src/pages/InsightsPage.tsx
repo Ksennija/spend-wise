@@ -5,40 +5,63 @@ import {
 } from "../api/categoryChanges";
 import CategoryChanges from "../components/CategoryChanges/CategoryChanges";
 import RatesNotice from "../components/RatesNotice/RatesNotice";
+import { useCurrency } from "../hooks/useCurrency";
 
 type View =
   | { status: "loading" }
   | { status: "ready"; data: CategoryChangesData }
-  | { status: "error"; message: string };
+  | { status: "error"; code: string; message: string };
 
 const RATES_UNAVAILABLE_MESSAGE =
   "Exchange rates are currently unavailable. Try again in a moment.";
 
 export default function InsightsPage() {
-  const [view, setView] = useState<View>({ status: "loading" });
+  const { selected, report, forget } = useCurrency();
   const [attempt, setAttempt] = useState(0);
+  // The answer is kept with the request it belongs to. When the user retries or chooses another
+  // currency, the request changes, and until its answer arrives the page shows "Loading…".
+  const [answer, setAnswer] = useState<{ request: string; view: View } | null>(null);
+  const request = `${attempt}:${selected ?? ""}`;
+  const view: View =
+    answer?.request === request ? answer.view : { status: "loading" };
 
+  // Only the user's own choice goes to the server. Without one the server picks the currency.
   useEffect(() => {
     let cancelled = false;
-    getCategoryChanges().then((result) => {
+    getCategoryChanges(selected).then((result) => {
       if (cancelled) return;
       if (result.ok) {
-        setView({ status: "ready", data: result.categoryChanges });
+        setAnswer({ request, view: { status: "ready", data: result.categoryChanges } });
       } else {
         const message =
           result.code === "rates-unavailable"
             ? RATES_UNAVAILABLE_MESSAGE
             : result.message;
-        setView({ status: "error", message });
+        setAnswer({ request, view: { status: "error", code: result.code, message } });
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [request, selected]);
+
+  // The currency the server used is what the dropdown shows until the user chooses one.
+  const usedCurrency = view.status === "ready" ? view.data.currency : undefined;
+  useEffect(() => {
+    if (usedCurrency) report(usedCurrency);
+  }, [usedCurrency, report]);
+
+  // A saved currency the server does not know is forgotten, and the page asks again without it.
+  // Until then the page waits instead of showing an error.
+  const rejectedCurrency =
+    view.status === "error" &&
+    view.code === "invalid-currency" &&
+    selected !== undefined;
+  useEffect(() => {
+    if (rejectedCurrency) forget();
+  }, [rejectedCurrency, forget]);
 
   function retry() {
-    setView({ status: "loading" });
     setAttempt((n) => n + 1);
   }
 
@@ -46,9 +69,11 @@ export default function InsightsPage() {
     <div>
       <h1>Insights</h1>
 
-      {view.status === "loading" && <p role="status">Loading…</p>}
+      {(view.status === "loading" || rejectedCurrency) && (
+        <p role="status">Loading…</p>
+      )}
 
-      {view.status === "error" && (
+      {view.status === "error" && !rejectedCurrency && (
         <>
           <p role="alert" style={{ color: "crimson" }}>
             {view.message}
