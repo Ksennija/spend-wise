@@ -1,36 +1,47 @@
 // Values follow the category menu in frontend/design/transactions.html: a button, and a panel
 // with checkboxes and Clear that opens under it.
 
+// The filter always has the same width, whatever its label says, so the toolbar does not move when
+// the checked categories change. The button and the panel under it share that width.
 .root {
   position: relative;
+  flex: none;
+  width: 230px;
+  max-width: 100%;
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px var(--space-3);
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 10px 34px 10px var(--space-3);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink);
   font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; // a long label ends with "…" instead of widening the button
   cursor: pointer;
 
-  // A chevron drawn with borders, so it adds no text for screen readers and none to the button's
-  // label.
+  // A chevron drawn with borders on the right, so it adds no text for screen readers and none to
+  // the button's label.
   &::after {
     content: "";
+    position: absolute;
+    top: calc(50% - 5px);
+    right: 14px;
     width: 6px;
     height: 6px;
-    margin-top: -3px;
     border: solid currentcolor;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
 
   &[aria-expanded="true"]::after {
-    margin-top: 3px;
+    top: calc(50% - 1px);
     transform: rotate(-135deg);
   }
 }
@@ -40,8 +51,7 @@
   top: calc(100% + 6px);
   left: 0;
   z-index: 5;
-  min-width: 230px;
-  max-width: calc(100vw - 2 * var(--space-4));
+  width: 100%;
   max-height: 70vh;
   overflow-y: auto;
   padding: 14px;
