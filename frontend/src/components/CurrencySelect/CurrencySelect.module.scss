@@ -1,0 +1,118 @@
+// Values follow the currency dropdown in frontend/design/overview.html and insights.html.
+
+.currency {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.label {
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+}
+
+// The button always has the same width, whatever currency it shows.
+.root {
+  position: relative;
+  flex: none;
+  width: 190px;
+  max-width: 100%;
+}
+
+.button {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 8px 32px 8px var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+  }
+
+  // A chevron drawn with borders, so it adds no text for screen readers and none to the label.
+  &::after {
+    content: "";
+    position: absolute;
+    top: calc(50% - 5px);
+    right: 14px;
+    width: 6px;
+    height: 6px;
+    border: solid currentcolor;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  &[aria-expanded="true"]::after {
+    top: calc(50% - 1px);
+    transform: rotate(-135deg);
+  }
+}
+
+// The panel opens under the button, aligned to its right edge.
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  width: 250px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+}
+
+.list {
+  max-height: 230px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.option {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) 10px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--soft);
+  }
+}
+
+// After .option, so its colours win.
+.selected {
+  background: var(--soft);
+  color: var(--green);
+  font-weight: var(--weight-bold);
+}
+
+.empty {
+  margin: 10px 0 0;
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+
+  &:empty {
+    display: none;
+  }
+}
