@@ -39,15 +39,18 @@ export default function CategoryFilter({ selected, onChange }: Props) {
     onChange(CATEGORIES.filter((c) => next.has(c.id)).map((c) => c.id));
   }
 
+  // Escape and the Close button both close the panel and give the focus back to the button.
+  function closePanel() {
+    setOpen(false);
+    buttonRef.current?.focus();
+  }
+
   return (
     <div
       ref={rootRef}
       className={styles.root}
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && open) {
-          setOpen(false);
-          buttonRef.current?.focus();
-        }
+        if (e.key === 'Escape' && open) closePanel();
       }}
     >
       <button
@@ -81,11 +84,14 @@ export default function CategoryFilter({ selected, onChange }: Props) {
           <div className={styles.actions}>
             <button
               type="button"
-              className={styles.clear}
+              className={styles.action}
               disabled={selected.length === 0}
               onClick={() => onChange([])}
             >
               Clear
+            </button>
+            <button type="button" className={styles.action} onClick={closePanel}>
+              Close
             </button>
           </div>
         </div>

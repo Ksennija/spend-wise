@@ -34,7 +34,7 @@ The single-select dropdown "Filter by category" and its option "All categories".
   - a button, always visible, with `aria-expanded` and `aria-controls`, which opens and closes the panel
   - the panel is a `<fieldset>` with the legend "Categories" and one checkbox per entry of `CATEGORIES`, in that order, each with its label
   - a "Clear" button in the panel, disabled when nothing is checked
-  - Escape closes the panel and puts the focus back on the button. A click outside the panel closes it as well. Choosing a category does not close it
+  - Escape closes the panel and puts the focus back on the button. A click outside the panel closes it as well. A Close button next to Clear does the same as Escape: it closes the panel, keeps the checks and puts the focus back on the button. Choosing a category does not close it
   - checking or unchecking calls `onChange` with the new list, in the order of `CATEGORIES`, not in the order of the clicks
 - Button text:
 
@@ -77,7 +77,7 @@ The single-select dropdown "Filter by category" and its option "All categories".
 - The button text follows the table above
 - The checked categories stay when moving to another month, during loading and after Retry
 - With no match, the message names the chosen categories and the table is gone
-- The panel opens and closes with the button, closes on Escape and on a click outside, and keeps the checks when it closes
+- The panel opens and closes with the button, closes on Escape, on a click outside and with its Close button, and keeps the checks when it closes
 - Everything works with the keyboard: Tab to the button, Enter or Space to open, Tab through the checkboxes, Space to check, Escape to close
 - The Overview, the import and the API are unchanged
 
@@ -95,6 +95,7 @@ Frontend only.
 - unchecking removes the id
 - "Clear" calls `onChange([])` and is disabled when nothing is checked
 - Escape closes the panel and returns the focus to the button
+- the Close button closes the panel, keeps the checks and returns the focus to the button
 - a click outside closes the panel, a click inside does not
 
 `TransactionsPage.test.tsx`:
@@ -130,7 +131,7 @@ Frontend only.
 
 ## Decisions beyond the ticket
 
-- The panel closes on Escape and on a click outside
+- The panel closes on Escape, on a click outside and with the Close button
 - The list passed to `onChange` follows the order of the categories, not of the clicks
 - The text in the button and in the empty message is shortened when many categories are checked
 - The "All categories" option disappears: nothing checked means all
